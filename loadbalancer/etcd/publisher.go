@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/loadbalancer"
+	"github.com/go-kit/kit/loadbalancer/fixed"
 	"github.com/go-kit/kit/log"
 )
 
@@ -13,7 +14,7 @@ import (
 type Publisher struct {
 	client Client
 	prefix string
-	cache  *loadbalancer.EndpointCache
+	cache  *fixed.Publisher
 	logger log.Logger
 	quit   chan struct{}
 }
@@ -24,7 +25,7 @@ func NewPublisher(c Client, prefix string, f loadbalancer.Factory, logger log.Lo
 	p := &Publisher{
 		client: c,
 		prefix: prefix,
-		cache:  loadbalancer.NewEndpointCache(f, logger),
+		cache:  fixed.NewPublisher(f, logger),
 		logger: logger,
 		quit:   make(chan struct{}),
 	}

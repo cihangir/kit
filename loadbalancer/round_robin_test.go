@@ -1,27 +1,46 @@
 package loadbalancer_test
 
 import (
+	"fmt"
+	"io"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/loadbalancer"
 	"github.com/go-kit/kit/loadbalancer/fixed"
+	"github.com/go-kit/kit/log"
 	"golang.org/x/net/context"
 )
 
 func TestRoundRobinDistribution(t *testing.T) {
 	var (
-		ctx       = context.Background()
-		counts    = []int{0, 0, 0}
-		endpoints = []endpoint.Endpoint{
-			func(context.Context, interface{}) (interface{}, error) { counts[0]++; return struct{}{}, nil },
-			func(context.Context, interface{}) (interface{}, error) { counts[1]++; return struct{}{}, nil },
-			func(context.Context, interface{}) (interface{}, error) { counts[2]++; return struct{}{}, nil },
+		ctx    = context.Background()
+		n      = 3
+		hosts  = make([]string, n)
+		counts = make([]int, n)
+
+		f = func(s string) (endpoint.Endpoint, io.Closer, error) {
+			return func(context.Context, interface{}) (interface{}, error) {
+				i, err := strconv.Atoi(s)
+				if err != nil {
+					return nil, fmt.Errorf("Can not convert %+v to integer", s)
+				}
+
+				counts[i]++
+				return struct{}{}, nil
+			}, nil, nil
 		}
+		p = fixed.NewPublisher(f, log.NewNopLogger())
 	)
 
-	lb := loadbalancer.NewRoundRobin(fixed.NewPublisher(endpoints))
+	for i := 0; i < n; i++ {
+		hosts[i] = strconv.Itoa(i)
+	}
+
+	p.Replace(hosts)
+	lb := loadbalancer.NewRoundRobin(p)
 
 	for i, want := range [][]int{
 		{1, 0, 0},
